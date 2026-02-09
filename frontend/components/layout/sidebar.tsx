@@ -1,9 +1,9 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import { ListTodo, CheckCircle2, Circle } from "lucide-react"
+import { ListTodo, CheckCircle2, Circle, MessageSquare } from "lucide-react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, usePathname } from "next/navigation"
 
 const navItems = [
   { label: "All Tasks", icon: ListTodo, href: "/dashboard", filter: "all" },
@@ -11,12 +11,15 @@ const navItems = [
   { label: "Completed", icon: CheckCircle2, href: "/dashboard?status=completed", filter: "completed" },
 ]
 
+const chatItem = { label: "Chat", icon: MessageSquare, href: "/chat" }
+
 interface SidebarProps {
   onNavigate?: () => void
 }
 
 export function Sidebar({ onNavigate }: SidebarProps) {
   const searchParams = useSearchParams()
+  const pathname = usePathname()
   const currentStatus = searchParams.get("status")
   const currentFilter = searchParams.get("filter")
 
@@ -53,6 +56,23 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           </Link>
         )
       })}
+
+      {/* Chat Section */}
+      <div className="mt-6 mb-2 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+        AI Assistant
+      </div>
+      <Link
+        href={chatItem.href}
+        onClick={onNavigate}
+        className={cn(
+          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+          "hover:bg-accent hover:text-accent-foreground",
+          pathname === "/chat" && "bg-accent text-accent-foreground font-medium"
+        )}
+      >
+        <chatItem.icon className="h-4 w-4" />
+        {chatItem.label}
+      </Link>
     </nav>
   )
 }
