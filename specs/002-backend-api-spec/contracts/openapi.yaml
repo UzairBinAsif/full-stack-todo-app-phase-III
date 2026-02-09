@@ -1,0 +1,366 @@
+openapi: 3.1.0
+info:
+  title: Todo API
+  description: Secure task management API with user isolation
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: http://localhost:8000
+    description: Development server
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from Better Auth
+
+  schemas:
+    Task:
+      type: object
+      required:
+        - id
+        - user_id
+        - title
+        - completed
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          description: Unique task identifier
+          example: 1
+        user_id:
+          type: string
+          description: Owner user ID
+          example: "user_abc123"
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Task title
+          example: "Buy groceries"
+        description:
+          type: string
+          nullable: true
+          description: Optional task description
+          example: "Milk, eggs, bread"
+        completed:
+          type: boolean
+          description: Completion status
+          example: false
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp (UTC)
+          example: "2026-02-07T12:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp (UTC)
+          example: "2026-02-07T12:00:00Z"
+
+    CreateTask:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Task title (required)
+          example: "Buy groceries"
+        description:
+          type: string
+          nullable: true
+          description: Optional description
+          example: "Milk, eggs, bread"
+
+    UpdateTask:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: New title
+          example: "Buy groceries (updated)"
+        description:
+          type: string
+          nullable: true
+          description: New description
+        completed:
+          type: boolean
+          description: New completion status
+          example: true
+
+    Error:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          description: Error message
+          example: "Task not found"
+
+    SuccessMessage:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Task deleted successfully"
+
+  parameters:
+    userId:
+      name: user_id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: User ID (must match JWT)
+      example: "user_abc123"
+
+    taskId:
+      name: task_id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: Task ID
+      example: 1
+
+    status:
+      name: status
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [all, pending, completed]
+        default: all
+      description: Filter by completion status
+
+    sort:
+      name: sort
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [created, title]
+        default: created
+      description: Sort order
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            detail: "Token has expired"
+
+    Forbidden:
+      description: Access denied to resource
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            detail: "Access denied: Cannot access other user's resources"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            detail: "Task 123 not found"
+
+paths:
+  /api/{user_id}/tasks:
+    get:
+      summary: List user's tasks
+      operationId: listTasks
+      tags:
+        - Tasks
+      parameters:
+        - $ref: '#/components/parameters/userId'
+        - $ref: '#/components/parameters/status'
+        - $ref: '#/components/parameters/sort'
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      summary: Create new task
+      operationId: createTask
+      tags:
+        - Tasks
+      parameters:
+        - $ref: '#/components/parameters/userId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTask'
+      responses:
+        '201':
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/{user_id}/tasks/{task_id}:
+    get:
+      summary: Get single task
+      operationId: getTask
+      tags:
+        - Tasks
+      parameters:
+        - $ref: '#/components/parameters/userId'
+        - $ref: '#/components/parameters/taskId'
+      responses:
+        '200':
+          description: Task details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      summary: Update task
+      operationId: updateTask
+      tags:
+        - Tasks
+      parameters:
+        - $ref: '#/components/parameters/userId'
+        - $ref: '#/components/parameters/taskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTask'
+      responses:
+        '200':
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      summary: Delete task
+      operationId: deleteTask
+      tags:
+        - Tasks
+      parameters:
+        - $ref: '#/components/parameters/userId'
+        - $ref: '#/components/parameters/taskId'
+      responses:
+        '200':
+          description: Task deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/{user_id}/tasks/{task_id}/complete:
+    patch:
+      summary: Toggle task completion
+      operationId: toggleComplete
+      tags:
+        - Tasks
+      parameters:
+        - $ref: '#/components/parameters/userId'
+        - $ref: '#/components/parameters/taskId'
+      responses:
+        '200':
+          description: Completion toggled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      tags:
+        - System
+      security: []
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  version:
+                    type: string
+                    example: "1.0.0"
