@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     # CORS
     CORS_ORIGINS: str = "http://localhost:3000"
 
+    # OpenAI
+    OPENAI_API_KEY: str
+    OPENAI_MODEL: str = "gpt-4o-mini"
+
     @property
     def cors_origins_list(self) -> List[str]:
         """Parse CORS_ORIGINS string into list."""

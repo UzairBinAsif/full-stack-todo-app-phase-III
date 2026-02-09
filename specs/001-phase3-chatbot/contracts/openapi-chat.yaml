@@ -1,0 +1,222 @@
+openapi: 3.1.0
+info:
+  title: Phase III Chat API
+  description: Stateless chat endpoint for AI-powered Todo chatbot
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+  - url: https://api.your-app.com
+    description: Production
+
+paths:
+  /api/{user_id}/chat:
+    post:
+      operationId: chat
+      summary: Process chat message
+      description: |
+        Handle user chat message with stateless conversation management.
+
+        Flow:
+        1. Validate user ownership (path user_id must match JWT)
+        2. Get or create conversation
+        3. Load full message history from DB (stateless)
+        4. Store user message
+        5. Generate AI response (placeholder in integration layer)
+        6. Store assistant response
+        7. Return structured response
+      tags:
+        - chat
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: User ID (must match authenticated user)
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+            examples:
+              new_conversation:
+                summary: Start new conversation
+                value:
+                  message: "Hello, can you help me with my tasks?"
+              continue_conversation:
+                summary: Continue existing conversation
+                value:
+                  conversation_id: 123
+                  message: "What tasks do I have due today?"
+      responses:
+        '200':
+          description: Chat response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+              examples:
+                success:
+                  value:
+                    conversation_id: 123
+                    response: "I've added 'buy groceries' to your tasks for tomorrow."
+                    tool_calls:
+                      - tool: create_todo
+                        arguments:
+                          title: buy groceries
+                          due_date: "2026-02-10"
+                        result: success
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                empty_message:
+                  value:
+                    error: "Message is required"
+                message_too_long:
+                  value:
+                    error: "Message too long (max 4000 characters)"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Unauthorized"
+        '403':
+          description: Forbidden - user_id mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Forbidden: user_id mismatch"
+        '404':
+          description: Conversation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Conversation not found"
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Internal server error"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Better Auth session token or JWT
+
+  schemas:
+    ChatRequest:
+      type: object
+      required:
+        - message
+      properties:
+        conversation_id:
+          type: integer
+          nullable: true
+          description: Existing conversation ID. If omitted, creates new conversation.
+          example: 123
+        message:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          description: User's natural language input
+          example: "Add a task to buy groceries tomorrow"
+
+    ChatResponse:
+      type: object
+      required:
+        - conversation_id
+        - response
+        - tool_calls
+      properties:
+        conversation_id:
+          type: integer
+          description: The conversation ID (existing or newly created)
+          example: 123
+        response:
+          type: string
+          description: Assistant's text reply
+          example: "I've added 'buy groceries' to your tasks for tomorrow."
+        tool_calls:
+          type: array
+          description: Metadata about any backend actions performed
+          items:
+            $ref: '#/components/schemas/ToolCallMetadata'
+
+    ToolCallMetadata:
+      type: object
+      required:
+        - tool
+        - arguments
+        - result
+      properties:
+        tool:
+          type: string
+          description: Name of the tool/function called
+          example: "create_todo"
+        arguments:
+          type: object
+          description: Arguments passed to the tool
+          additionalProperties: true
+          example:
+            title: "buy groceries"
+            due_date: "2026-02-10"
+        result:
+          type: string
+          description: Result of the tool call
+          example: "success"
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Conversation not found"
+
+    ValidationErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
+            properties:
+              loc:
+                type: array
+                items:
+                  type: string
+              msg:
+                type: string
+              type:
+                type: string
